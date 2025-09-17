@@ -115,6 +115,30 @@ npm run dev:remote
 
 When deploying behind HTTPS, expose the same endpoints over `https://` so ChatGPT can reach them.
 
+### Local MCP Dev API
+
+Want to exercise MCP tools directly from curl/Postman? Launch the lightweight dev API server:
+
+```bash
+# Start the Express dev MCP API server
+npm run dev:api
+```
+
+The server listens on `http://localhost:4100` (override via `DEV_API_PORT`). It loads the same configuration as the MCP server and exposes all registered tools over HTTP:
+
+- `GET /health` – quick status plus configured tool names
+- `GET /tools` – full tool definitions (matches `ListTools`)
+- `POST /tools/<toolName>` – invoke a tool with a JSON body of arguments
+- `POST /call` – mimic a raw `CallTool` request (`{ "name": "issues", "arguments": {...} }`)
+
+Example curl to list high-priority issues via the `issues` tool:
+
+```bash
+curl -X POST http://localhost:4100/tools/issues \
+  -H "Content-Type: application/json" \
+  -d '{"action":"query","query":"priority: High"}'
+```
+
 ### ChatGPT Custom Connector Setup
 
 1. Deploy the remote server (container, VM, or serverless) with the required environment variables (`YOUTRACK_URL`, `YOUTRACK_TOKEN`, optional `PORT`/`MCP_BASE_PATH`).

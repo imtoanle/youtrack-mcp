@@ -545,14 +545,22 @@ export class IssuesAPIClient extends BaseAPIClient {
    * Apply a command to an issue
    */
   private async applyCommand(issueId: string, command: string): Promise<any> {
-    // Use idReadable format; YouTrack expects just the command in query, issues identified separately
     const endpoint = `/api/commands`;
+    const normalizedCommand = command.trim();
+    const trimmedIssueId = issueId.trim();
+
+    const issuesPayload: Array<{ id?: string; idReadable?: string }> = [];
+    const isInternalId = /^\d+-\d+$/.test(trimmedIssueId);
+
+    if (isInternalId) {
+      issuesPayload.push({ id: trimmedIssueId });
+    } else {
+      issuesPayload.push({ idReadable: trimmedIssueId });
+    }
+
     const response = await this.post(endpoint, {
-      query: command,
-      issues: [
-        { idReadable: issueId },
-        { id: issueId } // include internal id fallback
-      ]
+      query: normalizedCommand,
+      issues: issuesPayload
     });
     return response.data;
   }

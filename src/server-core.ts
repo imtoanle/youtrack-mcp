@@ -9,6 +9,7 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import dotenv from 'dotenv';
 import { ClientFactory } from './api/client.js';
+import { MCPResponse } from './api/base/base-client.js';
 import { ConfigManager } from './config.js';
 import { logger } from './logger.js';
 import { NotificationManager } from './notifications/notification-manager.js';
@@ -25,7 +26,7 @@ import { CoreTools } from './tools/core-tools.js';
 dotenv.config();
 
 // Tool definitions using our modular architecture
-const toolDefinitions = [
+export const toolDefinitions = [
   // PROJECT MANAGEMENT TOOLS
   {
     name: 'projects',
@@ -597,73 +598,96 @@ export class YouTrackMCPServer {
 
     this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const { name, arguments: args = {} } = request.params;
-
-      try {
-        const client = this.clientFactory.createClient();
-        
-        switch (name) {
-          case 'projects':
-            return await this.handleProjectsManage(client, args);
-          
-          case 'issues':
-            return await this.handleIssuesManage(client, args);
-          
-          case 'query':
-            return await this.handleQueryIssues(client, args);
-          
-          case 'comments':
-            return await this.handleCommentsManage(client, args);
-          
-          case 'agile_boards':
-            return await this.handleAgileManage(client, args);
-          
-          case 'knowledge_base':
-            return await this.handleKnowledgeManage(client, args);
-          
-          case 'analytics':
-            return await this.handleAnalyticsReport(client, args);
-          
-          case 'admin':
-            return await this.handleAdminOperations(client, args);
-          
-          case 'time_tracking':
-            return await this.handleTimeTracking(client, args);
-          
-          case 'auth':
-            return await this.coreTools.handleAuthManage(args);
-          
-          case 'notifications':
-            return await this.coreTools.handleNotifications(args);
-          
-          case 'subscriptions':
-            return await this.coreTools.handleSubscriptions(args);
-          
-          default: {
-            const suggestion = suggestToolName(name);
-            logger.warn('Unknown tool requested', { 
-              tool: name, 
-              suggestion: TOOL_NAME_MAPPINGS[name] || 'none',
-              availableTools: ['projects', 'issues', 'query', 'comments', 'agile_boards', 'knowledge_base', 'analytics', 'admin', 'time_tracking', 'auth', 'notifications', 'subscriptions']
-            });
-            throw new McpError(
-              ErrorCode.MethodNotFound,
-              `Unknown tool: ${name}. ${suggestion}`
-            );
-          }
-        }
-      } catch (error) {
-        logger.error('Tool execution error', { tool: name, error: error instanceof Error ? error.message : error });
-        
-        if (error instanceof McpError) {
-          throw error;
-        }
-        
-        throw new McpError(
-          ErrorCode.InternalError,
-          `Tool execution failed: ${error instanceof Error ? error.message : String(error)}`
-        );
-      }
+      return this.executeTool(name, args) as any;
     });
+  }
+
+  public async executeTool(name: string, args: Record<string, unknown> = {}): Promise<MCPResponse> {
+    return this.dispatchTool(name, args);
+  }
+
+  private async dispatchTool(name: string, args: Record<string, unknown>): Promise<MCPResponse> {
+    try {
+      const client = this.clientFactory.createClient();
+
+      switch (name) {
+        case 'projects':
+          return await this.handleProjectsManage(client, args);
+
+        case 'issues':
+          return await this.handleIssuesManage(client, args);
+
+        case 'query':
+          return await this.handleQueryIssues(client, args);
+
+        case 'comments':
+          return await this.handleCommentsManage(client, args);
+
+        case 'agile_boards':
+          return await this.handleAgileManage(client, args);
+
+        case 'knowledge_base':
+          return await this.handleKnowledgeManage(client, args);
+
+        case 'analytics':
+          return await this.handleAnalyticsReport(client, args);
+
+        case 'admin':
+          return await this.handleAdminOperations(client, args);
+
+        case 'time_tracking':
+          return await this.handleTimeTracking(client, args);
+
+        case 'auth':
+          return await this.coreTools.handleAuthManage(args);
+
+        case 'notifications':
+          return await this.coreTools.handleNotifications(args);
+
+        case 'subscriptions':
+          return await this.coreTools.handleSubscriptions(args);
+
+        default: {
+          const suggestion = suggestToolName(name);
+          logger.warn('Unknown tool requested', {
+            tool: name,
+            suggestion: TOOL_NAME_MAPPINGS[name] || 'none',
+            availableTools: [
+              'projects',
+              'issues',
+              'query',
+              'comments',
+              'agile_boards',
+              'knowledge_base',
+              'analytics',
+              'admin',
+              'time_tracking',
+              'auth',
+              'notifications',
+              'subscriptions',
+            ],
+          });
+          throw new McpError(
+            ErrorCode.MethodNotFound,
+            `Unknown tool: ${name}. ${suggestion}`
+          );
+        }
+      }
+    } catch (error) {
+      logger.error('Tool execution error', {
+        tool: name,
+        error: error instanceof Error ? error.message : error,
+      });
+
+      if (error instanceof McpError) {
+        throw error;
+      }
+
+      throw new McpError(
+        ErrorCode.InternalError,
+        `Tool execution failed: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
   }
 
   private async handleProjectsManage(client: any, args: any) {
@@ -758,7 +782,12 @@ export class YouTrackMCPServer {
       case 'get':
         return await client.issues.getIssue(issueId, fields);
       case 'query':
-        return await client.issues.queryIssues({ query });
+        return await client.issues.queryIssues({
+          query,
+          fields,
+          limit: args.limit,
+          skip: args.skip,
+        });
       case 'search':
         return await client.issues.smartSearchIssues(query, { projectId });
       case 'state':
@@ -776,10 +805,15 @@ export class YouTrackMCPServer {
 
   private async handleQueryIssues(client: any, args: any) {
     const { query, fields, limit } = args;
-    return await client.issues.queryIssues({ 
-      query, 
-      fields: fields ? fields.split(',') : ['id', 'summary', 'description', 'state', 'priority', 'reporter', 'assignee'],
-      limit: limit || 50
+    const resolvedFields =
+      typeof fields === 'string' && fields.trim().length > 0
+        ? fields
+        : 'id,summary,description,state,priority,reporter,assignee';
+
+    return await client.issues.queryIssues({
+      query,
+      fields: resolvedFields,
+      limit: limit || 50,
     });
   }
 
