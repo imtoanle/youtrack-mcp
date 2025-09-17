@@ -131,7 +131,7 @@ app.post(
   })
 );
 
-app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
+app.use((error: unknown, _req: Request, res: Response) => {
   if (error instanceof McpError) {
     const status = mapMcpErrorToStatus(error);
     logger.warn('Tool invocation failed with MCP error', {
