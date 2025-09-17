@@ -26,6 +26,12 @@ export interface GroupCreateParams {
   teamForProject?: string;
 }
 
+export interface BulkIssueLinkRequest {
+  sourceIssueId: string;
+  targetIssueId: string;
+  linkCommand?: string;
+}
+
 export interface CustomFieldParams {
   name: string;
   type: 'string' | 'integer' | 'float' | 'date' | 'period' | 'user' | 'group' | 'enum' | 'state' | 'build' | 'version';
@@ -706,6 +712,81 @@ export class AdminAPIClient extends BaseAPIClient {
     }, `Bulk update completed: ${results.length}/${issueIds.length} issues updated`);
   }
 
+  /**
+   * Bulk link issues using YouTrack command syntax
+   */
+  async bulkLinkIssues(
+    links: BulkIssueLinkRequest[],
+    options: { verify?: boolean } = {}
+  ): Promise<MCPResponse> {
+    if (!Array.isArray(links) || links.length === 0) {
+      return ResponseFormatter.formatError('No link requests provided');
+    }
+
+    const verify = options.verify !== false;
+    const results: any[] = [];
+    const errors: any[] = [];
+
+    for (const link of links) {
+      const sourceId = typeof link?.sourceIssueId === 'string' ? link.sourceIssueId.trim() : '';
+      const targetId = typeof link?.targetIssueId === 'string' ? link.targetIssueId.trim() : '';
+      const commandBase = typeof link?.linkCommand === 'string' && link.linkCommand.trim().length > 0
+        ? link.linkCommand.trim().replace(/\s+/g, ' ')
+        : 'relates to';
+
+      if (!sourceId || !targetId) {
+        errors.push({
+          sourceIssueId: link?.sourceIssueId,
+          targetIssueId: link?.targetIssueId,
+          error: 'sourceIssueId and targetIssueId are required',
+        });
+        continue;
+      }
+
+      try {
+        const resolvedTarget = await this.resolveIssueReadableId(targetId);
+        const command = `${commandBase} ${resolvedTarget}`;
+
+        await this.applyCommandToIssue(sourceId, command);
+
+        if (verify) {
+          const verified = await this.verifyIssueLink(sourceId, resolvedTarget);
+          if (!verified) {
+            errors.push({
+              sourceIssueId: sourceId,
+              targetIssueId: resolvedTarget,
+              error: 'Link command executed but verification failed',
+            });
+            continue;
+          }
+        }
+
+        results.push({
+          sourceIssueId: sourceId,
+          targetIssueId: resolvedTarget,
+          command: commandBase,
+          verified: verify,
+        });
+      } catch (error: any) {
+        errors.push({
+          sourceIssueId: sourceId,
+          targetIssueId: targetId,
+          error: error?.message || String(error),
+        });
+      }
+    }
+
+    return ResponseFormatter.formatSuccess({
+      linked: results,
+      errors,
+      summary: {
+        total: links.length,
+        successful: results.length,
+        failed: errors.length,
+      },
+    }, `Bulk link completed: ${results.length}/${links.length} links created`);
+  }
+
   private prepareBulkUpdatePayload(
     updates: any
   ): { payload: any; expectations: Map<string, string>; commands: string[] } {
@@ -877,6 +958,46 @@ export class AdminAPIClient extends BaseAPIClient {
         success: false,
         message: `Verification error: ${error.message}`
       };
+    }
+  }
+
+  private async verifyIssueLink(sourceIssueId: string, targetIssueId: string): Promise<boolean> {
+    try {
+      const normalizedTarget = targetIssueId.trim();
+      const response = await this.get(`/api/issues/${sourceIssueId}`, {
+        fields: 'idReadable,links(linkType(name),issues(id,idReadable))',
+      });
+
+      const links = Array.isArray(response.data?.links) ? response.data.links : [];
+
+      return links.some((link: any) => {
+        const linkedIssues = Array.isArray(link?.issues) ? link.issues : [];
+        return linkedIssues.some((issue: any) => {
+          const readability = typeof issue?.idReadable === 'string' ? issue.idReadable.trim() : undefined;
+          const internalId = issue?.id ? String(issue.id).trim() : undefined;
+          return readability === normalizedTarget || internalId === normalizedTarget;
+        });
+      });
+    } catch (error) {
+      return false;
+    }
+  }
+
+  private async resolveIssueReadableId(issueId: string): Promise<string> {
+    const trimmed = issueId.trim();
+
+    if (!/^\d+-\d+$/.test(trimmed)) {
+      return trimmed;
+    }
+
+    try {
+      const response = await this.get(`/api/issues/${trimmed}`, {
+        fields: 'idReadable',
+      });
+      const idReadable = response.data?.idReadable;
+      return typeof idReadable === 'string' && idReadable.trim().length > 0 ? idReadable.trim() : trimmed;
+    } catch (error) {
+      return trimmed;
     }
   }
 

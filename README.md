@@ -139,6 +139,25 @@ curl -X POST http://localhost:4100/tools/issues \
   -d '{"action":"query","query":"priority: High"}'
 ```
 
+Example curl to bulk-link issues via the `admin` tool:
+
+```bash
+curl -X POST http://localhost:4100/tools/admin \
+  -H "Content-Type: application/json" \
+  -d '{
+        "operation": "bulk_link",
+        "links": [
+          {"sourceIssueId": "FIN-60", "targetIssueId": "FIN-61", "linkCommand": "parent for"},
+          {"sourceIssueId": "FIN-62", "targetIssueId": "FIN-63"}
+        ]
+      }'
+```
+
+- `operation` must be `bulk_link` to activate the linker.
+- `links` is an array of link jobs; each item requires `sourceIssueId` (the issue the command runs against) and `targetIssueId` (the issue referenced in the command).
+- `linkCommand` is optional—defaults to `relates to`—and should match any valid YouTrack link phrase (`depends on`, `parent for`, `subtask of`, etc.).
+- Set the optional top-level flag `"verify": false` if you want to skip post-command verification (enabled by default).
+
 ### ChatGPT Custom Connector Setup
 
 1. Deploy the remote server (container, VM, or serverless) with the required environment variables (`YOUTRACK_URL`, `YOUTRACK_TOKEN`, optional `PORT`/`MCP_BASE_PATH`).

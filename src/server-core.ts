@@ -309,13 +309,13 @@ export const toolDefinitions = [
   // ADMIN OPERATIONS
   {
     name: 'admin',
-    description: 'Administrative operations: search users, inspect fields, list field values, bulk update, create dependencies',
+    description: 'Administrative operations: search users, inspect fields, list field values, bulk update, bulk link issues, create dependencies',
     inputSchema: {
       type: 'object',
       properties: {
         operation: {
           type: 'string',
-          enum: ['search_users', 'project_fields', 'field_values', 'bulk_update', 'dependencies'],
+          enum: ['search_users', 'project_fields', 'field_values', 'bulk_update', 'bulk_link', 'dependencies'],
           description: 'Admin operation to perform'
         },
         query: {
@@ -346,6 +346,32 @@ export const toolDefinitions = [
         targetIssueId: {
           type: 'string',
           description: 'Target issue ID (for dependencies)'
+        },
+        links: {
+          type: 'array',
+          description: 'List of source/target issue pairs to link (for bulk_link)',
+          items: {
+            type: 'object',
+            properties: {
+              sourceIssueId: {
+                type: 'string',
+                description: 'Issue ID to run the link command against'
+              },
+              targetIssueId: {
+                type: 'string',
+                description: 'Issue ID referenced in the link command'
+              },
+              linkCommand: {
+                type: 'string',
+                description: 'YouTrack link phrase (defaults to "relates to")'
+              }
+            },
+            required: ['sourceIssueId', 'targetIssueId']
+          }
+        },
+        verify: {
+          type: 'boolean',
+          description: 'Set to false to skip link verification when using bulk_link'
         }
       },
       required: ['operation']
@@ -950,7 +976,7 @@ export class YouTrackMCPServer {
   }
 
   private async handleAdminOperations(client: any, args: any) {
-    const { operation, query, projectId, fieldName, issueIds, updates, sourceIssueId, targetIssueId } = args;
+    const { operation, query, projectId, fieldName, issueIds, updates, sourceIssueId, targetIssueId, links, verify } = args;
     
     switch (operation) {
       case 'search_users':
@@ -961,6 +987,8 @@ export class YouTrackMCPServer {
         return await client.projects.getProjectFieldValues(projectId || this.resolveProjectId(), fieldName);
       case 'bulk_update':
         return await client.admin.bulkUpdateIssues(issueIds, updates);
+      case 'bulk_link':
+        return await client.admin.bulkLinkIssues(links, { verify });
       case 'dependencies':
         return await client.admin.createIssueDependency(sourceIssueId, targetIssueId);
       default:
