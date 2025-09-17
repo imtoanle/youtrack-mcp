@@ -55,14 +55,14 @@ const toolDefinitions = [
   // ISSUE MANAGEMENT TOOLS  
   {
     name: 'issues',
-    description: 'Issue lifecycle: create, update, query/search, change state, comment, start/complete work',
+    description: 'Issue lifecycle: create, update, query/search, change state, comment, start/complete work, link issues',
     inputSchema: {
       type: 'object',
       properties: {
         action: {
           type: 'string',
-          enum: ['create', 'update', 'get', 'query', 'search', 'state', 'complete', 'start'],
-          description: 'Action: create (new issue), update (modify), get (single issue), query (advanced search), search (smart search), state (change state), complete (mark done), start (begin work)'
+          enum: ['create', 'update', 'get', 'query', 'search', 'state', 'complete', 'start', 'link'],
+          description: 'Action: create (new issue), update (modify), get (single issue), query (advanced search), search (smart search), state (change state), complete (mark done), start (begin work), link (relate issues)'
         },
         projectId: {
           type: 'string',
@@ -103,6 +103,15 @@ const toolDefinitions = [
         comment: {
           type: 'string',
           description: 'Comment for state changes or completion'
+        },
+        targetIssueId: {
+          type: 'string',
+          description: 'Target issue to link with (required for link action)'
+        },
+        linkType: {
+          type: 'string',
+          description: 'Link command phrase (for example: "relates to", "depends on", "duplicates", "subtask of", "parent for")',
+          default: 'relates to'
         }
       },
       required: ['action']
@@ -691,7 +700,8 @@ export class YouTrackMCPServer {
   }
 
   private async handleIssuesManage(client: any, args: any) {
-    const { action, projectId, issueId, summary, description, query, state, comment, priority, assignee, type } = args;
+    const { action, projectId, issueId, summary, description, query, state, comment, priority, assignee, type, targetIssueId, linkType } = args;
+    let normalizedLinkType = linkType;
     
     // Validate parameters based on action
     try {
@@ -706,6 +716,13 @@ export class YouTrackMCPServer {
         case 'complete':
         case 'start':
           ParameterValidator.validateIssueId(issueId, 'issueId');
+          break;
+        case 'link':
+          ParameterValidator.validateIssueId(issueId, 'issueId');
+          ParameterValidator.validateIssueId(targetIssueId, 'targetIssueId');
+          if (linkType !== undefined) {
+            normalizedLinkType = ParameterValidator.validateRequired(linkType, 'linkType');
+          }
           break;
         case 'query':
         case 'search':
@@ -746,6 +763,8 @@ export class YouTrackMCPServer {
         return await client.issues.completeIssue(issueId, comment);
       case 'start':
         return await client.issues.startWorkingOnIssue(issueId, comment);
+      case 'link':
+        return await client.issues.linkIssues(issueId, targetIssueId, normalizedLinkType);
       default:
         throw new Error(`Unknown issues action: ${action}`);
     }

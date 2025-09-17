@@ -291,6 +291,25 @@ export class IssuesAPIClient extends BaseAPIClient {
     const response = await this.post(endpoint, linkData);
     return ResponseFormatter.formatCreated(response.data, 'Issue Link', `Dependency created: ${sourceIssueId} depends on ${targetIssueId}`);
   }
+
+  /**
+   * Link issues using command API (recommended approach per YouTrack docs).
+   * Accepts natural language link phrases such as "relates to", "subtask of", or "parent for".
+   */
+  async linkIssues(issueId: string, targetIssueId: string, linkCommand: string = 'relates to'): Promise<MCPResponse> {
+    const trimmedCommand = (linkCommand || 'relates to').trim().replace(/\s+/g, ' ');
+    const trimmedTarget = targetIssueId.trim();
+    const commandQuery = `${trimmedCommand} ${trimmedTarget}`;
+
+    const commandResult = await this.applyCommand(issueId, commandQuery);
+
+    return ResponseFormatter.formatSuccess({
+      issueId,
+      targetIssueId: trimmedTarget,
+      command: commandQuery,
+      commandResult
+    }, `Linked ${issueId} to ${trimmedTarget} using '${trimmedCommand}'`);
+  }
   
   /**
    * Delete issue link
@@ -525,16 +544,17 @@ export class IssuesAPIClient extends BaseAPIClient {
   /**
    * Apply a command to an issue
    */
-  private async applyCommand(issueId: string, command: string): Promise<void> {
+  private async applyCommand(issueId: string, command: string): Promise<any> {
     // Use idReadable format; YouTrack expects just the command in query, issues identified separately
     const endpoint = `/api/commands`;
-    await this.post(endpoint, {
+    const response = await this.post(endpoint, {
       query: command,
       issues: [
         { idReadable: issueId },
         { id: issueId } // include internal id fallback
       ]
     });
+    return response.data;
   }
 
   /**
