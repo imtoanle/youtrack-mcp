@@ -104,6 +104,10 @@ const toolDefinitions = [
           type: 'string',
           description: 'Comment for state changes or completion'
         },
+        fields: {
+          type: 'string',
+          description: 'Comma-separated fields to return when fetching a single issue'
+        },
         targetIssueId: {
           type: 'string',
           description: 'Target issue to link with (required for link action)'
@@ -700,7 +704,7 @@ export class YouTrackMCPServer {
   }
 
   private async handleIssuesManage(client: any, args: any) {
-    const { action, projectId, issueId, summary, description, query, state, comment, priority, assignee, type, targetIssueId, linkType } = args;
+    const { action, projectId, issueId, summary, description, query, state, comment, priority, assignee, type, fields, targetIssueId, linkType } = args;
     let normalizedLinkType = linkType;
     
     // Validate parameters based on action
@@ -752,7 +756,7 @@ export class YouTrackMCPServer {
           summary, description, state, priority, assignee, type 
         });
       case 'get':
-        return await client.issues.getIssue(issueId);
+        return await client.issues.getIssue(issueId, fields);
       case 'query':
         return await client.issues.queryIssues({ query });
       case 'search':
