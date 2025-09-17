@@ -16,12 +16,13 @@
     "test:queries": "npx tsx scripts/test-queries.ts",
     "test:enterprise": "npx tsx scripts/test-enterprise-features.ts",
     "verify-build": "npx tsx scripts/verify-build.ts",
-  "verify": "npm run verify-build",
-  "watch": "tsc -w --preserveWatchOutput",
+    "verify": "npm run verify-build",
+    "watch": "tsc -w --preserveWatchOutput",
     "lint": "eslint \"src/**/*.ts\" \"scripts/**/*.ts\"",
     "lint:check": "npm run lint",
     "format": "prettier --write src/**/*.ts",
-    "clean": "rimraf dist"
+    "clean": "rimraf dist",
+    "dev:api": "tsx src/dev-api-server.ts"
   },
   "keywords": [
     "mcp",
