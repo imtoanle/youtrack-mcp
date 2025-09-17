@@ -54,7 +54,7 @@ export class AdminAPIClient extends BaseAPIClient {
    */
   async createProject(params: ProjectCreateParams): Promise<MCPResponse> {
     const endpoint = '/api/admin/projects';
-    
+
     const projectData = {
       name: params.name,
       shortName: params.shortName,
@@ -92,7 +92,7 @@ export class AdminAPIClient extends BaseAPIClient {
    */
   async updateProject(projectId: string, updates: Partial<ProjectCreateParams>): Promise<MCPResponse> {
     const endpoint = `/api/admin/projects/${projectId}`;
-    
+
     const updateData: any = {};
     if (updates.name) updateData.name = updates.name;
     if (updates.description !== undefined) updateData.description = updates.description;
@@ -124,7 +124,7 @@ export class AdminAPIClient extends BaseAPIClient {
    */
   async createUser(params: UserCreateParams): Promise<MCPResponse> {
     const endpoint = '/api/admin/users';
-    
+
     const userData = {
       login: params.login,
       fullName: params.fullName,
@@ -144,20 +144,20 @@ export class AdminAPIClient extends BaseAPIClient {
   async getAllUsers(query?: string, limit: number = 100): Promise<MCPResponse> {
     const endpoint = '/api/users';
     const params: any = { $top: limit };
-    
+
     if (query) {
       params.query = query;
     }
 
     try {
       const response = await this.axios.get(endpoint, { params });
-      return ResponseFormatter.formatSuccess(response.data, 
+      return ResponseFormatter.formatSuccess(response.data,
         `Found ${response.data?.length || 0} users`, {
         source: endpoint
       });
     } catch (error: any) {
-      return ResponseFormatter.formatError(`Failed to get users: ${error.message}`, error, { 
-        source: endpoint 
+      return ResponseFormatter.formatError(`Failed to get users: ${error.message}`, error, {
+        source: endpoint
       });
     }
   }
@@ -174,7 +174,7 @@ export class AdminAPIClient extends BaseAPIClient {
    */
   async updateUser(userId: string, updates: Partial<UserCreateParams>): Promise<MCPResponse> {
     const endpoint = `/api/admin/users/${userId}`;
-    
+
     const updateData: any = {};
     if (updates.fullName) updateData.fullName = updates.fullName;
     if (updates.email) updateData.email = updates.email;
@@ -190,7 +190,7 @@ export class AdminAPIClient extends BaseAPIClient {
    */
   async banUser(userId: string, banned: boolean = true, reason?: string): Promise<MCPResponse> {
     const endpoint = `/api/admin/users/${userId}`;
-    
+
     const updateData = {
       banned,
       banReason: reason
@@ -208,7 +208,7 @@ export class AdminAPIClient extends BaseAPIClient {
    */
   async createGroup(params: GroupCreateParams): Promise<MCPResponse> {
     const endpoint = '/api/admin/groups';
-    
+
     const groupData = {
       name: params.name,
       description: params.description || '',
@@ -242,10 +242,10 @@ export class AdminAPIClient extends BaseAPIClient {
    */
   async addUserToGroup(groupId: string, userId: string): Promise<MCPResponse> {
     const endpoint = `/api/admin/groups/${groupId}/users`;
-    
+
     const userData = { id: userId };
     await this.post(endpoint, userData);
-    
+
     return ResponseFormatter.formatSuccess({
       groupId,
       userId,
@@ -258,7 +258,7 @@ export class AdminAPIClient extends BaseAPIClient {
    */
   async removeUserFromGroup(groupId: string, userId: string): Promise<MCPResponse> {
     const endpoint = `/api/admin/groups/${groupId}/users/${userId}`;
-    
+
     await this.delete(endpoint);
     return ResponseFormatter.formatSuccess({
       groupId,
@@ -274,7 +274,7 @@ export class AdminAPIClient extends BaseAPIClient {
    */
   async createCustomField(params: CustomFieldParams): Promise<MCPResponse> {
     const endpoint = '/api/admin/customFieldSettings/customFields';
-    
+
     const fieldData = {
       name: params.name,
       fieldType: { id: params.type },
@@ -310,7 +310,7 @@ export class AdminAPIClient extends BaseAPIClient {
    */
   async updateCustomField(fieldId: string, updates: Partial<CustomFieldParams>): Promise<MCPResponse> {
     const endpoint = `/api/admin/customFieldSettings/customFields/${fieldId}`;
-    
+
     const updateData: any = {};
     if (updates.name) updateData.name = updates.name;
     if (updates.isPrivate !== undefined) updateData.isPrivate = updates.isPrivate;
@@ -345,10 +345,10 @@ export class AdminAPIClient extends BaseAPIClient {
    */
   async updateSystemSetting(settingId: string, value: any): Promise<MCPResponse> {
     const endpoint = `/api/admin/globalSettings/${settingId}`;
-    
+
     const updateData = { value };
     const response = await this.post(endpoint, updateData);
-    
+
     return ResponseFormatter.formatUpdated(response.data, 'System Setting', { value }, `System setting ${settingId} updated successfully`);
   }
 
@@ -359,7 +359,7 @@ export class AdminAPIClient extends BaseAPIClient {
    */
   async getSystemHealth(): Promise<MCPResponse> {
     const endpoint = '/api/admin/health';
-    
+
     const response = await this.get(endpoint);
     const healthData = response.data || {};
 
@@ -374,7 +374,7 @@ export class AdminAPIClient extends BaseAPIClient {
    */
   async getDatabaseStats(): Promise<MCPResponse> {
     const endpoint = '/api/admin/database/stats';
-    
+
     const response = await this.get(endpoint);
     const stats = response.data || {};
 
@@ -394,7 +394,7 @@ export class AdminAPIClient extends BaseAPIClient {
    */
   async triggerBackup(includeAttachments: boolean = true): Promise<MCPResponse> {
     const endpoint = '/api/admin/backup';
-    
+
     const backupData = {
       includeAttachments,
       timestamp: Date.now()
@@ -411,7 +411,7 @@ export class AdminAPIClient extends BaseAPIClient {
    */
   async getLicenseInfo(): Promise<MCPResponse> {
     const endpoint = '/api/admin/license';
-    
+
     const response = await this.get(endpoint);
     const license = response.data || {};
 
@@ -449,15 +449,15 @@ export class AdminAPIClient extends BaseAPIClient {
    * Get time tracking report
    */
   async getTimeTrackingReport(
-    startDate?: string, 
-    endDate?: string, 
+    startDate?: string,
+    endDate?: string,
     groupBy: string = 'user',
-    projectId?: string, 
+    projectId?: string,
     userId?: string
   ): Promise<MCPResponse> {
     const endpoint = '/api/reports/timeTracking';
     const params: any = { groupBy };
-    
+
     if (startDate) params.startDate = startDate;
     if (endDate) params.endDate = endDate;
     if (projectId) params.project = projectId;
@@ -484,13 +484,13 @@ export class AdminAPIClient extends BaseAPIClient {
       const projectEndpoint = `/api/admin/projects/${projectId}`;
       const projectParams = { fields: 'id,shortName,name' };
       const projectResponse = await this.axios.get(projectEndpoint, { params: projectParams });
-      
+
       if (!projectResponse.data) {
         throw new Error(`Project ${projectId} not found`);
       }
-      
+
       const shortName = projectResponse.data.shortName;
-      
+
       const endpoint = `/api/issues`;
       const params: any = {
         query: `project: ${shortName}`,
@@ -515,15 +515,15 @@ export class AdminAPIClient extends BaseAPIClient {
         name: issue.summary,
         start: issue.created,
         end: issue.resolved || new Date().toISOString(),
-        duration: issue.resolved ? 
-          new Date(issue.resolved).getTime() - new Date(issue.created).getTime() : 
+        duration: issue.resolved ?
+          new Date(issue.resolved).getTime() - new Date(issue.created).getTime() :
           Date.now() - new Date(issue.created).getTime(),
         status: issue.resolved ? 'completed' : 'in-progress'
       }));
 
       return ResponseFormatter.formatAnalytics(
         ganttData,
-        { 
+        {
           reportType: 'gantt',
           projectId,
           totalTasks: ganttData.length,
@@ -545,13 +545,13 @@ export class AdminAPIClient extends BaseAPIClient {
       const projectEndpoint = `/api/admin/projects/${projectId}`;
       const projectParams = { fields: 'id,shortName,name' };
       const projectResponse = await this.axios.get(projectEndpoint, { params: projectParams });
-      
+
       if (!projectResponse.data) {
         throw new Error(`Project ${projectId} not found`);
       }
-      
+
       const shortName = projectResponse.data.shortName;
-      
+
       // Simplified critical path - would need dependency information for full implementation
       const endpoint = `/api/issues`;
       const params = {
@@ -602,13 +602,13 @@ export class AdminAPIClient extends BaseAPIClient {
       const projectEndpoint = `/api/admin/projects/${projectId}`;
       const projectParams = { fields: 'id,shortName,name' };
       const projectResponse = await this.axios.get(projectEndpoint, { params: projectParams });
-      
+
       if (!projectResponse.data) {
         throw new Error(`Project ${projectId} not found`);
       }
-      
+
       const shortName = projectResponse.data.shortName;
-      
+
       const endpoint = `/api/issues`;
       const params: any = {
         query: `project: ${shortName}`,
@@ -806,46 +806,46 @@ export class AdminAPIClient extends BaseAPIClient {
       commandPrefix: string;
       expectationTransform?: (value: string) => string;
     }> = [
-      {
-        key: 'type',
-        fieldName: 'Type',
-        normalize: (value) => (typeof value === 'string' && value.trim() ? value.trim() : null),
-        commandPrefix: 'Type',
-      },
-      {
-        key: 'state',
-        fieldName: 'State',
-        normalize: (value) => (typeof value === 'string' && value.trim() ? value.trim() : null),
-        commandPrefix: 'State',
-      },
-      {
-        key: 'priority',
-        fieldName: 'Priority',
-        normalize: (value) => (typeof value === 'string' && value.trim() ? value.trim() : null),
-        commandPrefix: 'Priority',
-      },
-      {
-        key: 'assignee',
-        fieldName: 'Assignee',
-        normalize: (value) => {
-          if (typeof value === 'string' && value.trim()) {
-            return value.trim();
-          }
-          if (value && typeof value === 'object' && typeof value.login === 'string') {
-            return value.login.trim();
-          }
-          return null;
+        {
+          key: 'type',
+          fieldName: 'Type',
+          normalize: (value) => (typeof value === 'string' && value.trim() ? value.trim() : null),
+          commandPrefix: 'Type',
         },
-        commandPrefix: 'Assignee',
-        expectationTransform: (value) => value,
-      },
-      {
-        key: 'subsystem',
-        fieldName: 'Subsystem',
-        normalize: (value) => (typeof value === 'string' && value.trim() ? value.trim() : null),
-        commandPrefix: 'Subsystem',
-      },
-    ];
+        {
+          key: 'state',
+          fieldName: 'State',
+          normalize: (value) => (typeof value === 'string' && value.trim() ? value.trim() : null),
+          commandPrefix: 'State',
+        },
+        {
+          key: 'priority',
+          fieldName: 'Priority',
+          normalize: (value) => (typeof value === 'string' && value.trim() ? value.trim() : null),
+          commandPrefix: 'Priority',
+        },
+        {
+          key: 'assignee',
+          fieldName: 'Assignee',
+          normalize: (value) => {
+            if (typeof value === 'string' && value.trim()) {
+              return value.trim();
+            }
+            if (value && typeof value === 'object' && typeof value.login === 'string') {
+              return value.login.trim();
+            }
+            return null;
+          },
+          commandPrefix: 'Assignee',
+          expectationTransform: (value) => value,
+        },
+        {
+          key: 'subsystem',
+          fieldName: 'Subsystem',
+          normalize: (value) => (typeof value === 'string' && value.trim() ? value.trim() : null),
+          commandPrefix: 'Subsystem',
+        },
+      ];
 
     for (const mapping of shorthandMappings) {
       if (mapping.key in payload) {
@@ -978,7 +978,7 @@ export class AdminAPIClient extends BaseAPIClient {
           return readability === normalizedTarget || internalId === normalizedTarget;
         });
       });
-    } catch (error) {
+    } catch {
       return false;
     }
   }
@@ -996,7 +996,7 @@ export class AdminAPIClient extends BaseAPIClient {
       });
       const idReadable = response.data?.idReadable;
       return typeof idReadable === 'string' && idReadable.trim().length > 0 ? idReadable.trim() : trimmed;
-    } catch (error) {
+    } catch {
       return trimmed;
     }
   }
@@ -1056,7 +1056,7 @@ export class AdminAPIClient extends BaseAPIClient {
 
     try {
       const response = await this.axios.post(endpoint, linkData);
-      return ResponseFormatter.formatSuccess(response.data, 
+      return ResponseFormatter.formatSuccess(response.data,
         `Created dependency: ${sourceIssueId} depends on ${targetIssueId}`);
     } catch (error: any) {
       return ResponseFormatter.formatError(`Failed to create issue dependency: ${error.message}`, error);
@@ -1068,18 +1068,18 @@ export class AdminAPIClient extends BaseAPIClient {
    */
   private calculateCriticality(issue: any): number {
     let score = 0;
-    
+
     // Priority weighting
     const priority = issue.priority?.name?.toLowerCase() || 'normal';
     if (priority.includes('critical')) score += 100;
     else if (priority.includes('high')) score += 75;
     else if (priority.includes('major')) score += 50;
     else if (priority.includes('medium') || priority.includes('normal')) score += 25;
-    
+
     // Age weighting (older issues get higher scores)
     const age = Math.floor((Date.now() - new Date(issue.created).getTime()) / (1000 * 60 * 60 * 24));
     score += Math.min(age, 365) / 10; // Cap at 1 year
-    
+
     return score;
   }
 }
