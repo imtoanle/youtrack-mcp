@@ -664,14 +664,32 @@ export class AdminAPIClient extends BaseAPIClient {
       return ResponseFormatter.formatError('No issue IDs provided for bulk update');
     }
 
+    const { payload, expectations, commands } = this.prepareBulkUpdatePayload(updates);
+
     const results: any[] = [];
-  const errors: any[] = [];
+    const errors: any[] = [];
 
     for (const issueId of issueIds) {
       try {
         const endpoint = `/api/issues/${issueId}`;
-        await this.axios.post(endpoint, updates);
-        results.push({ issueId, status: 'updated' });
+        if (this.hasPayloadUpdates(payload)) {
+          await this.axios.post(endpoint, payload);
+        }
+
+        for (const command of commands) {
+          await this.applyCommandToIssue(issueId, command);
+        }
+
+        if (expectations.size > 0) {
+          const verification = await this.verifyCustomFieldUpdates(issueId, expectations);
+          if (!verification.success) {
+            errors.push({ issueId, error: verification.message, details: verification.mismatches });
+            continue;
+          }
+          results.push({ issueId, status: 'updated', verified: true, appliedFields: verification.appliedFields });
+        } else {
+          results.push({ issueId, status: 'updated' });
+        }
       } catch (error: any) {
         errors.push({ issueId, error: error.message });
       }
@@ -686,6 +704,223 @@ export class AdminAPIClient extends BaseAPIClient {
         failed: errors.length
       }
     }, `Bulk update completed: ${results.length}/${issueIds.length} issues updated`);
+  }
+
+  private prepareBulkUpdatePayload(
+    updates: any
+  ): { payload: any; expectations: Map<string, string>; commands: string[] } {
+    if (!updates || typeof updates !== 'object') {
+      return { payload: updates, expectations: new Map(), commands: [] };
+    }
+
+    const payload: any = { ...updates };
+    const customFields = Array.isArray(payload.customFields) ? [...payload.customFields] : [];
+    const commands: string[] = [];
+    const expectations = new Map<string, string>();
+
+    const shorthandMappings: Array<{
+      key: string;
+      fieldName: string;
+      normalize: (value: any) => string | null;
+      commandPrefix: string;
+      expectationTransform?: (value: string) => string;
+    }> = [
+      {
+        key: 'type',
+        fieldName: 'Type',
+        normalize: (value) => (typeof value === 'string' && value.trim() ? value.trim() : null),
+        commandPrefix: 'Type',
+      },
+      {
+        key: 'state',
+        fieldName: 'State',
+        normalize: (value) => (typeof value === 'string' && value.trim() ? value.trim() : null),
+        commandPrefix: 'State',
+      },
+      {
+        key: 'priority',
+        fieldName: 'Priority',
+        normalize: (value) => (typeof value === 'string' && value.trim() ? value.trim() : null),
+        commandPrefix: 'Priority',
+      },
+      {
+        key: 'assignee',
+        fieldName: 'Assignee',
+        normalize: (value) => {
+          if (typeof value === 'string' && value.trim()) {
+            return value.trim();
+          }
+          if (value && typeof value === 'object' && typeof value.login === 'string') {
+            return value.login.trim();
+          }
+          return null;
+        },
+        commandPrefix: 'Assignee',
+        expectationTransform: (value) => value,
+      },
+      {
+        key: 'subsystem',
+        fieldName: 'Subsystem',
+        normalize: (value) => (typeof value === 'string' && value.trim() ? value.trim() : null),
+        commandPrefix: 'Subsystem',
+      },
+    ];
+
+    for (const mapping of shorthandMappings) {
+      if (mapping.key in payload) {
+        const normalizedValue = mapping.normalize(payload[mapping.key]);
+        if (normalizedValue) {
+          commands.push(`${mapping.commandPrefix} ${this.formatCommandValue(normalizedValue)}`);
+          expectations.set(
+            mapping.fieldName,
+            mapping.expectationTransform ? mapping.expectationTransform(normalizedValue) : normalizedValue
+          );
+        }
+        delete payload[mapping.key];
+      }
+    }
+
+    if (customFields.length > 0) {
+      payload.customFields = customFields;
+    }
+
+    const customFieldExpectations = this.extractExpectedCustomFieldValues(payload);
+    for (const [field, value] of customFieldExpectations.entries()) {
+      expectations.set(field, value);
+    }
+
+    return { payload, expectations, commands };
+  }
+
+  private extractExpectedCustomFieldValues(updates: any): Map<string, string> {
+    const expectations = new Map<string, string>();
+
+    if (!updates || typeof updates !== 'object') {
+      return expectations;
+    }
+
+    const customFields = Array.isArray(updates.customFields) ? updates.customFields : [];
+
+    for (const field of customFields) {
+      if (!field || typeof field !== 'object') {
+        continue;
+      }
+
+      const name = typeof field.name === 'string' ? field.name.trim() : undefined;
+      if (!name) {
+        continue;
+      }
+
+      const value = field.value;
+      if (value && typeof value === 'object') {
+        if (typeof value.name === 'string' && value.name.trim().length > 0) {
+          expectations.set(name, value.name.trim());
+          continue;
+        }
+        if (typeof value.id === 'string' && value.id.trim().length > 0) {
+          expectations.set(name, value.id.trim());
+          continue;
+        }
+        if (typeof value.login === 'string' && value.login.trim().length > 0) {
+          expectations.set(name, value.login.trim());
+          continue;
+        }
+      }
+    }
+
+    return expectations;
+  }
+
+  private async verifyCustomFieldUpdates(
+    issueId: string,
+    expected: Map<string, string>
+  ): Promise<{
+    success: boolean;
+    message?: string;
+    mismatches?: Array<{ field: string; expected: string; actual?: string }>;
+    appliedFields?: Record<string, string>;
+  }> {
+    try {
+      const response = await this.get(`/api/issues/${issueId}`, {
+        fields: `id,idReadable,customFields(name,value(name,id,login))`
+      });
+
+      const customFields = Array.isArray(response.data?.customFields)
+        ? response.data.customFields
+        : [];
+
+      const applied: Record<string, string> = {};
+      const mismatches: Array<{ field: string; expected: string; actual?: string }> = [];
+
+      for (const [fieldName, expectedValue] of expected.entries()) {
+        const actualField = customFields.find((field: any) => field?.name === fieldName);
+        const actualValue = actualField?.value?.name || actualField?.value?.id || actualField?.value?.login;
+
+        if (actualValue === expectedValue) {
+          applied[fieldName] = actualValue;
+        } else {
+          mismatches.push({ field: fieldName, expected: expectedValue, actual: actualValue });
+        }
+      }
+
+      if (mismatches.length > 0) {
+        return {
+          success: false,
+          message: 'Verification failed for one or more custom fields',
+          mismatches
+        };
+      }
+
+      return { success: true, appliedFields: applied };
+    } catch (error: any) {
+      return {
+        success: false,
+        message: `Verification error: ${error.message}`
+      };
+    }
+  }
+
+  private hasPayloadUpdates(payload: any): boolean {
+    if (!payload || typeof payload !== 'object') {
+      return false;
+    }
+
+    const keys = Object.keys(payload).filter((key) => payload[key] !== undefined && key !== 'customFields');
+    if (keys.length > 0) {
+      return true;
+    }
+
+    if (Array.isArray(payload.customFields) && payload.customFields.length > 0) {
+      return true;
+    }
+
+    return false;
+  }
+
+  private formatCommandValue(value: string): string {
+    const trimmed = value.trim();
+    if (/\s/.test(trimmed) || /"/.test(trimmed)) {
+      const escaped = trimmed.replace(/"/g, '\\"');
+      return `"${escaped}"`;
+    }
+    return trimmed;
+  }
+
+  private async applyCommandToIssue(issueId: string, command: string): Promise<void> {
+    const trimmedIssueId = issueId.trim();
+    const isInternalId = /^\d+-\d+$/.test(trimmedIssueId);
+    const issuesPayload: Array<{ id?: string; idReadable?: string }> = [];
+
+    if (isInternalId) {
+      issuesPayload.push({ id: trimmedIssueId });
+    } else {
+      issuesPayload.push({ idReadable: trimmedIssueId });
+    }
+
+    await this.post('/api/commands', {
+      query: command.trim(),
+      issues: issuesPayload,
+    });
   }
 
   /**
