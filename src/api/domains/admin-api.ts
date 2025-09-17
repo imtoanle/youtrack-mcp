@@ -26,6 +26,12 @@ export interface GroupCreateParams {
   teamForProject?: string;
 }
 
+export interface BulkIssueLinkRequest {
+  sourceIssueId: string;
+  targetIssueId: string;
+  linkCommand?: string;
+}
+
 export interface CustomFieldParams {
   name: string;
   type: 'string' | 'integer' | 'float' | 'date' | 'period' | 'user' | 'group' | 'enum' | 'state' | 'build' | 'version';
@@ -48,7 +54,7 @@ export class AdminAPIClient extends BaseAPIClient {
    */
   async createProject(params: ProjectCreateParams): Promise<MCPResponse> {
     const endpoint = '/api/admin/projects';
-    
+
     const projectData = {
       name: params.name,
       shortName: params.shortName,
@@ -86,7 +92,7 @@ export class AdminAPIClient extends BaseAPIClient {
    */
   async updateProject(projectId: string, updates: Partial<ProjectCreateParams>): Promise<MCPResponse> {
     const endpoint = `/api/admin/projects/${projectId}`;
-    
+
     const updateData: any = {};
     if (updates.name) updateData.name = updates.name;
     if (updates.description !== undefined) updateData.description = updates.description;
@@ -118,7 +124,7 @@ export class AdminAPIClient extends BaseAPIClient {
    */
   async createUser(params: UserCreateParams): Promise<MCPResponse> {
     const endpoint = '/api/admin/users';
-    
+
     const userData = {
       login: params.login,
       fullName: params.fullName,
@@ -138,20 +144,20 @@ export class AdminAPIClient extends BaseAPIClient {
   async getAllUsers(query?: string, limit: number = 100): Promise<MCPResponse> {
     const endpoint = '/api/users';
     const params: any = { $top: limit };
-    
+
     if (query) {
       params.query = query;
     }
 
     try {
       const response = await this.axios.get(endpoint, { params });
-      return ResponseFormatter.formatSuccess(response.data, 
+      return ResponseFormatter.formatSuccess(response.data,
         `Found ${response.data?.length || 0} users`, {
         source: endpoint
       });
     } catch (error: any) {
-      return ResponseFormatter.formatError(`Failed to get users: ${error.message}`, error, { 
-        source: endpoint 
+      return ResponseFormatter.formatError(`Failed to get users: ${error.message}`, error, {
+        source: endpoint
       });
     }
   }
@@ -168,7 +174,7 @@ export class AdminAPIClient extends BaseAPIClient {
    */
   async updateUser(userId: string, updates: Partial<UserCreateParams>): Promise<MCPResponse> {
     const endpoint = `/api/admin/users/${userId}`;
-    
+
     const updateData: any = {};
     if (updates.fullName) updateData.fullName = updates.fullName;
     if (updates.email) updateData.email = updates.email;
@@ -184,7 +190,7 @@ export class AdminAPIClient extends BaseAPIClient {
    */
   async banUser(userId: string, banned: boolean = true, reason?: string): Promise<MCPResponse> {
     const endpoint = `/api/admin/users/${userId}`;
-    
+
     const updateData = {
       banned,
       banReason: reason
@@ -202,7 +208,7 @@ export class AdminAPIClient extends BaseAPIClient {
    */
   async createGroup(params: GroupCreateParams): Promise<MCPResponse> {
     const endpoint = '/api/admin/groups';
-    
+
     const groupData = {
       name: params.name,
       description: params.description || '',
@@ -236,10 +242,10 @@ export class AdminAPIClient extends BaseAPIClient {
    */
   async addUserToGroup(groupId: string, userId: string): Promise<MCPResponse> {
     const endpoint = `/api/admin/groups/${groupId}/users`;
-    
+
     const userData = { id: userId };
     await this.post(endpoint, userData);
-    
+
     return ResponseFormatter.formatSuccess({
       groupId,
       userId,
@@ -252,7 +258,7 @@ export class AdminAPIClient extends BaseAPIClient {
    */
   async removeUserFromGroup(groupId: string, userId: string): Promise<MCPResponse> {
     const endpoint = `/api/admin/groups/${groupId}/users/${userId}`;
-    
+
     await this.delete(endpoint);
     return ResponseFormatter.formatSuccess({
       groupId,
@@ -268,7 +274,7 @@ export class AdminAPIClient extends BaseAPIClient {
    */
   async createCustomField(params: CustomFieldParams): Promise<MCPResponse> {
     const endpoint = '/api/admin/customFieldSettings/customFields';
-    
+
     const fieldData = {
       name: params.name,
       fieldType: { id: params.type },
@@ -304,7 +310,7 @@ export class AdminAPIClient extends BaseAPIClient {
    */
   async updateCustomField(fieldId: string, updates: Partial<CustomFieldParams>): Promise<MCPResponse> {
     const endpoint = `/api/admin/customFieldSettings/customFields/${fieldId}`;
-    
+
     const updateData: any = {};
     if (updates.name) updateData.name = updates.name;
     if (updates.isPrivate !== undefined) updateData.isPrivate = updates.isPrivate;
@@ -339,10 +345,10 @@ export class AdminAPIClient extends BaseAPIClient {
    */
   async updateSystemSetting(settingId: string, value: any): Promise<MCPResponse> {
     const endpoint = `/api/admin/globalSettings/${settingId}`;
-    
+
     const updateData = { value };
     const response = await this.post(endpoint, updateData);
-    
+
     return ResponseFormatter.formatUpdated(response.data, 'System Setting', { value }, `System setting ${settingId} updated successfully`);
   }
 
@@ -353,7 +359,7 @@ export class AdminAPIClient extends BaseAPIClient {
    */
   async getSystemHealth(): Promise<MCPResponse> {
     const endpoint = '/api/admin/health';
-    
+
     const response = await this.get(endpoint);
     const healthData = response.data || {};
 
@@ -368,7 +374,7 @@ export class AdminAPIClient extends BaseAPIClient {
    */
   async getDatabaseStats(): Promise<MCPResponse> {
     const endpoint = '/api/admin/database/stats';
-    
+
     const response = await this.get(endpoint);
     const stats = response.data || {};
 
@@ -388,7 +394,7 @@ export class AdminAPIClient extends BaseAPIClient {
    */
   async triggerBackup(includeAttachments: boolean = true): Promise<MCPResponse> {
     const endpoint = '/api/admin/backup';
-    
+
     const backupData = {
       includeAttachments,
       timestamp: Date.now()
@@ -405,7 +411,7 @@ export class AdminAPIClient extends BaseAPIClient {
    */
   async getLicenseInfo(): Promise<MCPResponse> {
     const endpoint = '/api/admin/license';
-    
+
     const response = await this.get(endpoint);
     const license = response.data || {};
 
@@ -443,15 +449,15 @@ export class AdminAPIClient extends BaseAPIClient {
    * Get time tracking report
    */
   async getTimeTrackingReport(
-    startDate?: string, 
-    endDate?: string, 
+    startDate?: string,
+    endDate?: string,
     groupBy: string = 'user',
-    projectId?: string, 
+    projectId?: string,
     userId?: string
   ): Promise<MCPResponse> {
     const endpoint = '/api/reports/timeTracking';
     const params: any = { groupBy };
-    
+
     if (startDate) params.startDate = startDate;
     if (endDate) params.endDate = endDate;
     if (projectId) params.project = projectId;
@@ -478,13 +484,13 @@ export class AdminAPIClient extends BaseAPIClient {
       const projectEndpoint = `/api/admin/projects/${projectId}`;
       const projectParams = { fields: 'id,shortName,name' };
       const projectResponse = await this.axios.get(projectEndpoint, { params: projectParams });
-      
+
       if (!projectResponse.data) {
         throw new Error(`Project ${projectId} not found`);
       }
-      
+
       const shortName = projectResponse.data.shortName;
-      
+
       const endpoint = `/api/issues`;
       const params: any = {
         query: `project: ${shortName}`,
@@ -509,15 +515,15 @@ export class AdminAPIClient extends BaseAPIClient {
         name: issue.summary,
         start: issue.created,
         end: issue.resolved || new Date().toISOString(),
-        duration: issue.resolved ? 
-          new Date(issue.resolved).getTime() - new Date(issue.created).getTime() : 
+        duration: issue.resolved ?
+          new Date(issue.resolved).getTime() - new Date(issue.created).getTime() :
           Date.now() - new Date(issue.created).getTime(),
         status: issue.resolved ? 'completed' : 'in-progress'
       }));
 
       return ResponseFormatter.formatAnalytics(
         ganttData,
-        { 
+        {
           reportType: 'gantt',
           projectId,
           totalTasks: ganttData.length,
@@ -539,13 +545,13 @@ export class AdminAPIClient extends BaseAPIClient {
       const projectEndpoint = `/api/admin/projects/${projectId}`;
       const projectParams = { fields: 'id,shortName,name' };
       const projectResponse = await this.axios.get(projectEndpoint, { params: projectParams });
-      
+
       if (!projectResponse.data) {
         throw new Error(`Project ${projectId} not found`);
       }
-      
+
       const shortName = projectResponse.data.shortName;
-      
+
       // Simplified critical path - would need dependency information for full implementation
       const endpoint = `/api/issues`;
       const params = {
@@ -596,13 +602,13 @@ export class AdminAPIClient extends BaseAPIClient {
       const projectEndpoint = `/api/admin/projects/${projectId}`;
       const projectParams = { fields: 'id,shortName,name' };
       const projectResponse = await this.axios.get(projectEndpoint, { params: projectParams });
-      
+
       if (!projectResponse.data) {
         throw new Error(`Project ${projectId} not found`);
       }
-      
+
       const shortName = projectResponse.data.shortName;
-      
+
       const endpoint = `/api/issues`;
       const params: any = {
         query: `project: ${shortName}`,
@@ -664,14 +670,32 @@ export class AdminAPIClient extends BaseAPIClient {
       return ResponseFormatter.formatError('No issue IDs provided for bulk update');
     }
 
+    const { payload, expectations, commands } = this.prepareBulkUpdatePayload(updates);
+
     const results: any[] = [];
-  const errors: any[] = [];
+    const errors: any[] = [];
 
     for (const issueId of issueIds) {
       try {
         const endpoint = `/api/issues/${issueId}`;
-        await this.axios.post(endpoint, updates);
-        results.push({ issueId, status: 'updated' });
+        if (this.hasPayloadUpdates(payload)) {
+          await this.axios.post(endpoint, payload);
+        }
+
+        for (const command of commands) {
+          await this.applyCommandToIssue(issueId, command);
+        }
+
+        if (expectations.size > 0) {
+          const verification = await this.verifyCustomFieldUpdates(issueId, expectations);
+          if (!verification.success) {
+            errors.push({ issueId, error: verification.message, details: verification.mismatches });
+            continue;
+          }
+          results.push({ issueId, status: 'updated', verified: true, appliedFields: verification.appliedFields });
+        } else {
+          results.push({ issueId, status: 'updated' });
+        }
       } catch (error: any) {
         errors.push({ issueId, error: error.message });
       }
@@ -689,6 +713,338 @@ export class AdminAPIClient extends BaseAPIClient {
   }
 
   /**
+   * Bulk link issues using YouTrack command syntax
+   */
+  async bulkLinkIssues(
+    links: BulkIssueLinkRequest[],
+    options: { verify?: boolean } = {}
+  ): Promise<MCPResponse> {
+    if (!Array.isArray(links) || links.length === 0) {
+      return ResponseFormatter.formatError('No link requests provided');
+    }
+
+    const verify = options.verify !== false;
+    const results: any[] = [];
+    const errors: any[] = [];
+
+    for (const link of links) {
+      const sourceId = typeof link?.sourceIssueId === 'string' ? link.sourceIssueId.trim() : '';
+      const targetId = typeof link?.targetIssueId === 'string' ? link.targetIssueId.trim() : '';
+      const commandBase = typeof link?.linkCommand === 'string' && link.linkCommand.trim().length > 0
+        ? link.linkCommand.trim().replace(/\s+/g, ' ')
+        : 'relates to';
+
+      if (!sourceId || !targetId) {
+        errors.push({
+          sourceIssueId: link?.sourceIssueId,
+          targetIssueId: link?.targetIssueId,
+          error: 'sourceIssueId and targetIssueId are required',
+        });
+        continue;
+      }
+
+      try {
+        const resolvedTarget = await this.resolveIssueReadableId(targetId);
+        const command = `${commandBase} ${resolvedTarget}`;
+
+        await this.applyCommandToIssue(sourceId, command);
+
+        if (verify) {
+          const verified = await this.verifyIssueLink(sourceId, resolvedTarget);
+          if (!verified) {
+            errors.push({
+              sourceIssueId: sourceId,
+              targetIssueId: resolvedTarget,
+              error: 'Link command executed but verification failed',
+            });
+            continue;
+          }
+        }
+
+        results.push({
+          sourceIssueId: sourceId,
+          targetIssueId: resolvedTarget,
+          command: commandBase,
+          verified: verify,
+        });
+      } catch (error: any) {
+        errors.push({
+          sourceIssueId: sourceId,
+          targetIssueId: targetId,
+          error: error?.message || String(error),
+        });
+      }
+    }
+
+    return ResponseFormatter.formatSuccess({
+      linked: results,
+      errors,
+      summary: {
+        total: links.length,
+        successful: results.length,
+        failed: errors.length,
+      },
+    }, `Bulk link completed: ${results.length}/${links.length} links created`);
+  }
+
+  private prepareBulkUpdatePayload(
+    updates: any
+  ): { payload: any; expectations: Map<string, string>; commands: string[] } {
+    if (!updates || typeof updates !== 'object') {
+      return { payload: updates, expectations: new Map(), commands: [] };
+    }
+
+    const payload: any = { ...updates };
+    const customFields = Array.isArray(payload.customFields) ? [...payload.customFields] : [];
+    const commands: string[] = [];
+    const expectations = new Map<string, string>();
+
+    const shorthandMappings: Array<{
+      key: string;
+      fieldName: string;
+      normalize: (value: any) => string | null;
+      commandPrefix: string;
+      expectationTransform?: (value: string) => string;
+    }> = [
+        {
+          key: 'type',
+          fieldName: 'Type',
+          normalize: (value) => (typeof value === 'string' && value.trim() ? value.trim() : null),
+          commandPrefix: 'Type',
+        },
+        {
+          key: 'state',
+          fieldName: 'State',
+          normalize: (value) => (typeof value === 'string' && value.trim() ? value.trim() : null),
+          commandPrefix: 'State',
+        },
+        {
+          key: 'priority',
+          fieldName: 'Priority',
+          normalize: (value) => (typeof value === 'string' && value.trim() ? value.trim() : null),
+          commandPrefix: 'Priority',
+        },
+        {
+          key: 'assignee',
+          fieldName: 'Assignee',
+          normalize: (value) => {
+            if (typeof value === 'string' && value.trim()) {
+              return value.trim();
+            }
+            if (value && typeof value === 'object' && typeof value.login === 'string') {
+              return value.login.trim();
+            }
+            return null;
+          },
+          commandPrefix: 'Assignee',
+          expectationTransform: (value) => value,
+        },
+        {
+          key: 'subsystem',
+          fieldName: 'Subsystem',
+          normalize: (value) => (typeof value === 'string' && value.trim() ? value.trim() : null),
+          commandPrefix: 'Subsystem',
+        },
+      ];
+
+    for (const mapping of shorthandMappings) {
+      if (mapping.key in payload) {
+        const normalizedValue = mapping.normalize(payload[mapping.key]);
+        if (normalizedValue) {
+          commands.push(`${mapping.commandPrefix} ${this.formatCommandValue(normalizedValue)}`);
+          expectations.set(
+            mapping.fieldName,
+            mapping.expectationTransform ? mapping.expectationTransform(normalizedValue) : normalizedValue
+          );
+        }
+        delete payload[mapping.key];
+      }
+    }
+
+    if (customFields.length > 0) {
+      payload.customFields = customFields;
+    }
+
+    const customFieldExpectations = this.extractExpectedCustomFieldValues(payload);
+    for (const [field, value] of customFieldExpectations.entries()) {
+      expectations.set(field, value);
+    }
+
+    return { payload, expectations, commands };
+  }
+
+  private extractExpectedCustomFieldValues(updates: any): Map<string, string> {
+    const expectations = new Map<string, string>();
+
+    if (!updates || typeof updates !== 'object') {
+      return expectations;
+    }
+
+    const customFields = Array.isArray(updates.customFields) ? updates.customFields : [];
+
+    for (const field of customFields) {
+      if (!field || typeof field !== 'object') {
+        continue;
+      }
+
+      const name = typeof field.name === 'string' ? field.name.trim() : undefined;
+      if (!name) {
+        continue;
+      }
+
+      const value = field.value;
+      if (value && typeof value === 'object') {
+        if (typeof value.name === 'string' && value.name.trim().length > 0) {
+          expectations.set(name, value.name.trim());
+          continue;
+        }
+        if (typeof value.id === 'string' && value.id.trim().length > 0) {
+          expectations.set(name, value.id.trim());
+          continue;
+        }
+        if (typeof value.login === 'string' && value.login.trim().length > 0) {
+          expectations.set(name, value.login.trim());
+          continue;
+        }
+      }
+    }
+
+    return expectations;
+  }
+
+  private async verifyCustomFieldUpdates(
+    issueId: string,
+    expected: Map<string, string>
+  ): Promise<{
+    success: boolean;
+    message?: string;
+    mismatches?: Array<{ field: string; expected: string; actual?: string }>;
+    appliedFields?: Record<string, string>;
+  }> {
+    try {
+      const response = await this.get(`/api/issues/${issueId}`, {
+        fields: `id,idReadable,customFields(name,value(name,id,login))`
+      });
+
+      const customFields = Array.isArray(response.data?.customFields)
+        ? response.data.customFields
+        : [];
+
+      const applied: Record<string, string> = {};
+      const mismatches: Array<{ field: string; expected: string; actual?: string }> = [];
+
+      for (const [fieldName, expectedValue] of expected.entries()) {
+        const actualField = customFields.find((field: any) => field?.name === fieldName);
+        const actualValue = actualField?.value?.name || actualField?.value?.id || actualField?.value?.login;
+
+        if (actualValue === expectedValue) {
+          applied[fieldName] = actualValue;
+        } else {
+          mismatches.push({ field: fieldName, expected: expectedValue, actual: actualValue });
+        }
+      }
+
+      if (mismatches.length > 0) {
+        return {
+          success: false,
+          message: 'Verification failed for one or more custom fields',
+          mismatches
+        };
+      }
+
+      return { success: true, appliedFields: applied };
+    } catch (error: any) {
+      return {
+        success: false,
+        message: `Verification error: ${error.message}`
+      };
+    }
+  }
+
+  private async verifyIssueLink(sourceIssueId: string, targetIssueId: string): Promise<boolean> {
+    try {
+      const normalizedTarget = targetIssueId.trim();
+      const response = await this.get(`/api/issues/${sourceIssueId}`, {
+        fields: 'idReadable,links(linkType(name),issues(id,idReadable))',
+      });
+
+      const links = Array.isArray(response.data?.links) ? response.data.links : [];
+
+      return links.some((link: any) => {
+        const linkedIssues = Array.isArray(link?.issues) ? link.issues : [];
+        return linkedIssues.some((issue: any) => {
+          const readability = typeof issue?.idReadable === 'string' ? issue.idReadable.trim() : undefined;
+          const internalId = issue?.id ? String(issue.id).trim() : undefined;
+          return readability === normalizedTarget || internalId === normalizedTarget;
+        });
+      });
+    } catch {
+      return false;
+    }
+  }
+
+  private async resolveIssueReadableId(issueId: string): Promise<string> {
+    const trimmed = issueId.trim();
+
+    if (!/^\d+-\d+$/.test(trimmed)) {
+      return trimmed;
+    }
+
+    try {
+      const response = await this.get(`/api/issues/${trimmed}`, {
+        fields: 'idReadable',
+      });
+      const idReadable = response.data?.idReadable;
+      return typeof idReadable === 'string' && idReadable.trim().length > 0 ? idReadable.trim() : trimmed;
+    } catch {
+      return trimmed;
+    }
+  }
+
+  private hasPayloadUpdates(payload: any): boolean {
+    if (!payload || typeof payload !== 'object') {
+      return false;
+    }
+
+    const keys = Object.keys(payload).filter((key) => payload[key] !== undefined && key !== 'customFields');
+    if (keys.length > 0) {
+      return true;
+    }
+
+    if (Array.isArray(payload.customFields) && payload.customFields.length > 0) {
+      return true;
+    }
+
+    return false;
+  }
+
+  private formatCommandValue(value: string): string {
+    const trimmed = value.trim();
+    if (/\s/.test(trimmed) || /"/.test(trimmed)) {
+      const escaped = trimmed.replace(/"/g, '\\"');
+      return `"${escaped}"`;
+    }
+    return trimmed;
+  }
+
+  private async applyCommandToIssue(issueId: string, command: string): Promise<void> {
+    const trimmedIssueId = issueId.trim();
+    const isInternalId = /^\d+-\d+$/.test(trimmedIssueId);
+    const issuesPayload: Array<{ id?: string; idReadable?: string }> = [];
+
+    if (isInternalId) {
+      issuesPayload.push({ id: trimmedIssueId });
+    } else {
+      issuesPayload.push({ idReadable: trimmedIssueId });
+    }
+
+    await this.post('/api/commands', {
+      query: command.trim(),
+      issues: issuesPayload,
+    });
+  }
+
+  /**
    * Create issue dependency
    */
   async createIssueDependency(sourceIssueId: string, targetIssueId: string): Promise<MCPResponse> {
@@ -700,7 +1056,7 @@ export class AdminAPIClient extends BaseAPIClient {
 
     try {
       const response = await this.axios.post(endpoint, linkData);
-      return ResponseFormatter.formatSuccess(response.data, 
+      return ResponseFormatter.formatSuccess(response.data,
         `Created dependency: ${sourceIssueId} depends on ${targetIssueId}`);
     } catch (error: any) {
       return ResponseFormatter.formatError(`Failed to create issue dependency: ${error.message}`, error);
@@ -712,18 +1068,18 @@ export class AdminAPIClient extends BaseAPIClient {
    */
   private calculateCriticality(issue: any): number {
     let score = 0;
-    
+
     // Priority weighting
     const priority = issue.priority?.name?.toLowerCase() || 'normal';
     if (priority.includes('critical')) score += 100;
     else if (priority.includes('high')) score += 75;
     else if (priority.includes('major')) score += 50;
     else if (priority.includes('medium') || priority.includes('normal')) score += 25;
-    
+
     // Age weighting (older issues get higher scores)
     const age = Math.floor((Date.now() - new Date(issue.created).getTime()) / (1000 * 60 * 60 * 24));
     score += Math.min(age, 365) / 10; // Cap at 1 year
-    
+
     return score;
   }
 }
